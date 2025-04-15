@@ -1,199 +1,154 @@
 <template>
 	<div class="container">
-		<h1 class="hello">
-			小刘是直男吗
-		</h1>
+		<div
+			ref="target"
+			class="target"
+			:style="{ transform: `rotate(${-rotationAngle}deg)` }"
+		></div>
+
+		<div
+			v-if="showWhip"
+			ref="whip"
+			class="whip"
+			:style="whipStyle"
+		></div>
 	</div>
 </template>
 
-<script>
-export default {
-    data () {
-        return {
-            name: 'App',
-            nameText: '你觉得自己是吗',
-            buttonText: '不是',
-            buttonStyle: {
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-            },
-            attempts: 0,
-            showConfetti: false,
-            yesShowConfetti: false,
-            confettis: [],
-            sounds: {
-                miss: null,
-                laugh: null,
-            },
-        };
-    },
-    methods: {
-        moveButton () {
-            this.sounds.miss.play();
-            this.attempts++;
+<script setup>
+import { ref, onMounted, onBeforeUnmount } from 'vue';
 
-            // 随机新位置
-            const newTop = Math.random() * 80 + 10;
-            const newLeft = Math.random() * 80 + 10;
+const target = ref( null );
+const whip = ref( null );
+const showWhip = ref( false );
 
-            this.buttonStyle = {
-                position: 'absolute',
-                top: `${newTop}%`,
-                left: `${newLeft}%`,
-                transform: 'none',
-                transition: 'all 0.3s ease-out',
-            };
+// 旋转控制参数
+const rotationAngle = ref( 0 );
+const rotateSpeed = ref( 3 );
+let lastFrameTime = 0;
+let animationFrameId = null;
 
-            // 偶尔改变按钮文字
-            if ( Math.random() > 0.7 ) {
-                const texts = ['差一点!', '哈哈抓不到', '太慢啦~', '再试一次'];
-                const texts1 = ['能不能说实话!', '心里没点数吗', '还点', '你是认真的吗'];
-                this.buttonText = texts[Math.floor( Math.random() * texts.length )];
-                this.nameText = texts1[Math.floor( Math.random() * texts1.length )];
-            }
-        },
-        handleClick ( type ) {
-            if ( type == 2 ) {
-                // 只有按钮在原始位置时才可能被点击
-                if ( this.buttonStyle.top === '50%' && this.buttonStyle.left === '50%' ) {
-                    this.showConfetti = true;
-                    this.sounds.laugh.play();
-                    this.createConfetti();
-                } else {
-                    this.moveButton();
-                }
-            } else {
-                this.yesShowConfetti = true;
-                this.createConfetti();
-            }
+// 鞭子样式
+const whipStyle = ref( {
+    right: '20px',
+    bottom: '50%',
+} );
 
-        },
-        createConfetti () {
-            // 创建50个彩色纸屑
-            this.confettis = [];
-            const colors = [
-                '#f44336',
-                '#e91e63',
-                '#9c27b0',
-                '#673ab7',
-                '#3f51b5',
-                '#2196f3',
-                '#03a9f4',
-                '#00bcd4',
-                '#009688',
-                '#4CAF50',
-            ];
+// 动画循环
+const animate = ( currentTime ) => {
+    if ( !lastFrameTime ) {
+        lastFrameTime = currentTime;
+    }
 
-            for ( let i = 0; i < 50; i++ ) {
-                this.confettis.push( {
-                    style: {
-                        backgroundColor: colors[Math.floor( Math.random() * colors.length )],
-                        left: `${Math.random() * 100}%`,
-                        animationDuration: `${Math.random() * 3 + 2}s`,
-                        animationDelay: `${Math.random() * 0.5}s`,
-                    },
-                } );
-            }
-        },
-        reset () {
-            this.buttonStyle = {
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-            };
-            this.showConfetti = false;
-            this.attempts = 0;
-            this.buttonText = '点我试试~';
-        },
-    },
+    // 计算时间差并更新角度
+    const deltaTime = currentTime - lastFrameTime;
+    rotationAngle.value += rotateSpeed.value * deltaTime / 16.67;
+
+    // 保持角度在0~360范围内
+    rotationAngle.value %= 360;
+
+    lastFrameTime = currentTime;
+    animationFrameId = requestAnimationFrame( animate );
 };
-</script>
 
+// 鞭打动画
+const handleHit = () => {
+    // 加速旋转
+    rotateSpeed.value = Math.min( 40, rotateSpeed.value + 7 );
+
+    // 设置鞭子位置
+    if ( target.value ) {
+        const rect = target.value.getBoundingClientRect();
+        whipStyle.value = {
+            right: `${window.innerWidth - rect.right + 20}px`,
+            bottom: `${window.innerHeight - rect.bottom + 100}px`,
+            animation: 'whip-swing 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards',
+        };
+    }
+
+    // 显示鞭子
+    showWhip.value = true;
+
+    // 600ms后隐藏鞭子
+    setTimeout( () => {
+        showWhip.value = false;
+    }, 600 );
+};
+
+// 初始化
+onMounted( () => {
+    animationFrameId = requestAnimationFrame( animate );
+
+    // 添加事件监听
+    window.addEventListener( 'click', handleHit );
+    window.addEventListener( 'touchstart', ( e ) => {
+        e.preventDefault();
+        handleHit();
+    } );
+} );
+
+// 清理
+onBeforeUnmount( () => {
+    if ( animationFrameId ) {
+        cancelAnimationFrame( animationFrameId );
+    }
+
+    window.removeEventListener( 'click', handleHit );
+    window.removeEventListener( 'touchstart', handleHit );
+} );
+</script>
 <style>
 .container {
-  height: 100%;
-  background: antiquewhite;
-  padding: 50px;
-}
-
-h1 {
-  color: #333;
-  font-size: 24px;
-}
-
-.prank-button , .prank-button-yes {
-  padding: 5px;
-  font-size: 16px;
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 50px;
-  cursor: pointer;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-  transition: all 0.3s;
-}
-
-.prank-button-yes {
-  background-color: #d99fbe;
-  margin-left: 10px;
-}
-
-.prank-button:hover {
-  background-color: #45a049;
-}
-
-.confetti-container {
-  position: fixed;
-  top: 0;
-  left: 0;
   width: 100%;
-  height: 100%;
-  background-color: rgba(0,0,0,0.8);
-  z-index: 100;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #f0f0f0;
+  touch-action: manipulation;
+  overflow: hidden;
 }
 
-.confetti {
-  position: absolute;
-  width: 10px;
-  height: 10px;
+.target {
+  width: 200px;
+  height: 200px;
+  background: url('../assets/top.png') center/contain no-repeat;
+  position: relative;
+  transform: rotate(0deg);
+}
+
+.whip {
+  position: fixed;
+  width: 160px;
+  height: 8px;
+  background: linear-gradient(to bottom, #8B4513 50%, transparent);
+  border-radius: 4px;
+  transform-origin: 90% 50%;
+  pointer-events: none;
   opacity: 0;
-  animation: fall linear forwards;
+  right: v-bind('whipStyle.right');
+  bottom: v-bind('whipStyle.bottom');
+  transform: rotate(90deg) translate(0, 0);
+  animation: v-bind('whipStyle.animation');
 }
 
-@keyframes fall {
+@keyframes whip-swing {
   0% {
-    transform: translateY(-100px) rotate(0deg);
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(100vh) rotate(360deg);
+    transform: rotate(90deg) translate(0, 0);
     opacity: 0;
   }
-}
-
-.message {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  color: white;
-  z-index: 101;
-}
-
-.message button {
-  padding: 10px;
-  background-color: #2196F3;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  margin-top: 20px;
-  cursor: pointer;
-}
-
-.button-content {
-  display: flex;
+  40% {
+    transform: rotate(180deg) translate(100px, 80px);
+    opacity: 1;
+    filter: brightness(1.5);
+  }
+  80% {
+    transform: rotate(210deg) translate(140px, 120px);
+    opacity: 0.6;
+  }
+  100% {
+    transform: rotate(270deg) translate(180px, 160px);
+    opacity: 0;
+  }
 }
 </style>
